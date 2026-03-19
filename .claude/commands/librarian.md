@@ -94,6 +94,25 @@ Report:
 - If fast downloads are exhausted, mention it (mirrors will still be tried)
 - For network errors, retry once before reporting failure
 
+## BookLore Integration (Optional)
+
+If `booklore` CLI is installed (from `booklore-cli` repo), you can also manage
+the user's BookLore library after downloading. The BookLore CLI wraps the
+BookLore REST API and provides commands for:
+
+- Listing/searching books: `booklore --json books list`
+- Managing shelves: `booklore --json shelves list`
+- Managing libraries: `booklore --json libraries list`
+- Updating metadata: `booklore --json metadata search BOOK_ID --provider Google`
+
+Check if available: `which booklore`
+
+BookLore environment variables:
+- `BOOKLORE_URL` — BookLore server URL
+- `BOOKLORE_USERNAME` / `BOOKLORE_PASSWORD` — credentials
+
+See the BookLore CLI SKILL.md for full command reference.
+
 ## Example Interactions
 
 User: "grab me the epub of Dune by Frank Herbert"
