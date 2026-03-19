@@ -96,22 +96,82 @@ Report:
 
 ## BookLore Integration (Optional)
 
-If `booklore` CLI is installed (from `booklore-cli` repo), you can also manage
-the user's BookLore library after downloading. The BookLore CLI wraps the
-BookLore REST API and provides commands for:
+If the `booklore` CLI is installed, you can manage the user's BookLore library
+after downloading. Check availability:
 
-- Listing/searching books: `booklore --json books list`
-- Managing shelves: `booklore --json shelves list`
-- Managing libraries: `booklore --json libraries list`
-- Updating metadata: `booklore --json metadata search BOOK_ID --provider Google`
+```bash
+which booklore
+```
 
-Check if available: `which booklore`
+### Discovery
 
-BookLore environment variables:
-- `BOOKLORE_URL` — BookLore server URL
+If installed, load the full command reference:
+
+```bash
+booklore --help
+# Or read the SKILL.md directly:
+cat "$(python3 -c "import cli_anything.booklore; import os; print(os.path.join(os.path.dirname(cli_anything.booklore.__file__), 'skills', 'SKILL.md'))")"
+```
+
+### Environment Variables
+
+- `BOOKLORE_URL` — BookLore server URL (default: `http://localhost:6060`)
 - `BOOKLORE_USERNAME` / `BOOKLORE_PASSWORD` — credentials
 
-See the BookLore CLI SKILL.md for full command reference.
+### Quick Command Reference
+
+All commands support `--json` for structured agent output.
+
+**Auth:**
+```bash
+booklore auth login -u USER -p PASS   # Log in (stores JWT)
+booklore auth status                    # Check auth status
+booklore auth me                        # Current user profile
+```
+
+**Books:**
+```bash
+booklore --json books list              # List all books
+booklore --json books get BOOK_ID       # Book details
+booklore books cover BOOK_ID -o FILE    # Download cover
+booklore books download BOOK_ID -o FILE # Download book file
+booklore --json books assign-shelves --book-ids 1,2 --assign 3  # Assign to shelf
+```
+
+**Metadata:**
+```bash
+booklore --json metadata search BOOK_ID --provider Google --title "Dune"
+booklore --json metadata update BOOK_ID --metadata-json '{"title":"Dune","authors":["Frank Herbert"]}'
+booklore --json metadata refresh --type LIBRARY --library-id 1
+booklore metadata upload-cover BOOK_ID cover.jpg
+```
+
+**Shelves:**
+```bash
+booklore --json shelves list            # List shelves
+booklore --json shelves create --name "Sci-Fi" --icon "rocket"
+booklore --json shelves books SHELF_ID  # Books in shelf
+```
+
+**Libraries:**
+```bash
+booklore --json libraries list          # List libraries
+booklore --json libraries books LIB_ID  # Books in library
+booklore --json libraries rescan LIB_ID # Rescan for changes
+```
+
+**Files:**
+```bash
+booklore --json files upload /tmp/book.pdf --library-id 1 --path-id 1
+```
+
+### Post-Download Workflow
+
+After Stacks finishes downloading a book:
+1. Rescan the BookLore library: `booklore --json libraries rescan LIB_ID`
+2. Find the new book: `booklore --json books list`
+3. Search metadata: `booklore --json metadata search BOOK_ID --provider Google`
+4. Optionally assign to a shelf: `booklore --json books assign-shelves --book-ids ID --assign SHELF_ID`
 
 ## Example Interactions
 
