@@ -13,12 +13,26 @@ from stacks.security.auth import (
 
 logger = logging.getLogger("api")
 
+
+def get_queue_ops():
+    """Get the queue operations instance for multi-process mode."""
+    from stacks.coordinator.queue_ops import QueueOperations
+    return QueueOperations()
+
+
 @api_bp.route('/api/history/clear', methods=['POST'])
 @require_auth_with_permissions(allow_downloader=False)
 def api_history_clear():
     """Clear entire history"""
-    q = current_app.stacks_queue
-    count = q.clear_history()
+    if current_app.stacks_multiprocess:
+        # Multi-process mode: use queue_ops
+        ops = get_queue_ops()
+        count = ops.clear_history()
+    else:
+        # Debug mode: use old queue
+        q = current_app.stacks_queue
+        count = q.clear_history()
+
     return jsonify({
         'success': True,
         'message': f'Cleared {count} item(s) from history'
@@ -31,13 +45,19 @@ def api_history_retry():
     """Retry a failed download"""
     data = request.json
     md5 = data.get('md5')
-    
+
     if not md5:
         return jsonify({'success': False, 'error': 'MD5 required'}), 400
 
-    q = current_app.stacks_queue
-    success, message = q.retry_failed(md5)
-    
+    if current_app.stacks_multiprocess:
+        # Multi-process mode: use queue_ops
+        ops = get_queue_ops()
+        success, message = ops.retry_failed(md5)
+    else:
+        # Debug mode: use old queue
+        q = current_app.stacks_queue
+        success, message = q.retry_failed(md5)
+
     return jsonify({
         'success': success,
         'message': message

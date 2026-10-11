@@ -121,6 +121,7 @@
               <li>Authentification</li>
               <li>Downloads</li>
               <li>FlareSolverr</li>
+              <li>Proxy</li>
               <li>Queue</li>
               <li>Logging</li>
             </ul>
@@ -275,6 +276,35 @@
                 </div>
               </div>
             </div>
+            <!-- Proxy -->
+            <div class="settings-content" data-setting="proxy">
+              <div class="settings-section">
+                <h3>
+                  <div class="title-switch">
+                    <label class="switch">
+                      <input type="checkbox" id="setting-proxy-enabled" />
+                      <span class="slider"></span>
+                      <span class="label"></span>
+                    </label>
+                    HTTP Proxy
+                  </div>
+                </h3>
+                <div class="settings-group">
+                  <label for="setting-proxy-url">Proxy URL</label>
+                  <input type="text" id="setting-proxy-url" placeholder="http://proxy.example.com:8080" />
+                  <div class="comment">HTTP or HTTPS proxy URL (e.g., http://proxy.example.com:8080)</div>
+
+                  <label for="setting-proxy-username">Username (optional)</label>
+                  <input type="text" id="setting-proxy-username" placeholder="Leave blank if not required" maxlength="128" />
+
+                  <label for="setting-proxy-password">Password (optional)</label>
+                  <input type="password" id="setting-proxy-password" placeholder="Leave blank if not required" maxlength="128" />
+
+                  <button class="btn btn-secondary btn--spaced" onclick="testProxy()">Test Connection</button>
+                  <div id="proxy-test-result" class="test-result"></div>
+                </div>
+              </div>
+            </div>
             <!-- Queue -->
             <div class="settings-content" data-setting="queue">
               <div class="settings-section">
@@ -322,7 +352,9 @@
         <div class="item-info">
           <div class="item-title">
             <span class="item-title-text"></span>
+            <span class="item-filetype"></span>
             <span class="item-subfolder"></span>
+            <span class="item-status"></span>
           </div>
           <div class="item-md5"></div>
           <div class="item-time"></div>

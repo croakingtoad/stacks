@@ -1,11 +1,27 @@
 #!/usr/bin/env python3
+"""
+Stacks main entry point.
+
+Starts the multi-process download system:
+- Initializes SQLite database
+- Spawns coordinator, download workers, and scraper processes
+- Starts Gunicorn web server
+- Handles graceful shutdown
+"""
+
 import os
 import sys
 import signal
 import argparse
-from stacks.server.webserver import create_app
+import subprocess
+import multiprocessing
+import logging
 from pathlib import Path
-from stacks.constants import CONFIG_FILE, PROJECT_ROOT, LOG_PATH, DOWNLOAD_PATH, GUNICORN_CONFIG_FILE
+
+from stacks.constants import (
+    CONFIG_FILE, PROJECT_ROOT, LOG_PATH, DOWNLOAD_PATH,
+    GUNICORN_CONFIG_FILE, DOWNLOAD_WORKERS
+)
 
 # ANSI color codes (Dracula theme)
 INFO = "\033[38;2;139;233;253m"       # cyan
@@ -17,10 +33,15 @@ BG = "\033[48;2;40;42;54m"            # black background
 PINKBG = "\033[48;2;255;102;217m"     # pink background
 RESET = "\033[0m"                     # reset
 
+# Global reference for signal handlers
+_process_manager = None
+_gunicorn_process = None
+
+
 def print_logo(version: str):
     """Display the super cool STACKS logo"""
     dashes = '─' * (52 - len(version))
-    
+
     print(f"{BG}{PURPLE} ┌───────────────────────────────────────────────────────────┐ {RESET}")
     print(f"{BG}{PURPLE} │                                                           {PURPLE}│ {RESET}")
     print(f"{BG}{PURPLE} │{PINK}     ▄████▄ ████████  ▄█▄     ▄████▄  ██    ▄██ ▄████▄     {PURPLE}│ {RESET}")
@@ -32,8 +53,8 @@ def print_logo(version: str):
     print(f"{BG}{PURPLE} │{PINK}     ▀████▀    ██  █{PURPLE}▀     ▀{PINK}█  ▀████▀  ██    ▀██ ▀████▀     {PURPLE}│ {RESET}")
     print(f"{BG}{PURPLE} │                                                           {PURPLE}│ {RESET}")
     print(f"{BG}{PURPLE} └{dashes}╢v{version}╟────┘ {RESET}")
-    sys.stdout.flush()  # Force flush before exec
     sys.stdout.flush()
+
 
 def ensure_directories():
     """Ensure essential directories exist."""
@@ -47,17 +68,14 @@ def ensure_directories():
 
 
 def setup_config(config_path):
-    """
-    Ensure a config file exists.
-    """
-    # Use either provided config, or default
+    """Ensure a config file exists."""
     cfg_path = Path(config_path) if config_path else Path(CONFIG_FILE)
 
     print("◼ Checking configuration...")
     sys.stdout.flush()
 
     if not cfg_path.exists():
-        print("  No config.yaml found — creating new one.")
+        print("  No config.yaml found - creating new one.")
         cfg_path.write_text("{}\n")
         cfg_path.chmod(0o600)
     else:
@@ -66,26 +84,81 @@ def setup_config(config_path):
     return str(cfg_path)
 
 
-def setup_signal_handlers(app):
-    """Setup graceful shutdown handlers for SIGTERM and SIGINT."""
+def init_database():
+    """Initialize the SQLite database and run migrations."""
+    print(f"{INFO}◼ Initializing database...{RESET}")
+    sys.stdout.flush()
+
+    from stacks.coordinator.database import init_database as db_init, migrate_from_json, startup_cleanup
+
+    db_init()
+    migrate_from_json()
+    startup_cleanup()
+
+    print(f"{GOOD}  Database ready{RESET}")
+    sys.stdout.flush()
+
+
+def setup_signal_handlers_multiprocess():
+    """Setup graceful shutdown handlers for multi-process mode."""
+    def shutdown_handler(signum, frame):
+        global _process_manager, _gunicorn_process
+
+        signal_name = "SIGTERM" if signum == signal.SIGTERM else "SIGINT"
+        print(f"\n{WARN}◼ Received {signal_name}, shutting down gracefully...{RESET}")
+        sys.stdout.flush()
+
+        # Stop worker processes
+        if _process_manager:
+            print(f"{INFO}  Stopping worker processes...{RESET}")
+            sys.stdout.flush()
+            _process_manager.stop_all(timeout=10)
+
+        # Stop Gunicorn (handles both subprocess.Popen and multiprocessing.Process)
+        if _gunicorn_process:
+            print(f"{INFO}  Stopping Gunicorn...{RESET}")
+            sys.stdout.flush()
+            _gunicorn_process.terminate()
+
+            # Wait for process to stop
+            if isinstance(_gunicorn_process, multiprocessing.Process):
+                _gunicorn_process.join(timeout=10)
+                if _gunicorn_process.is_alive():
+                    print(f"{WARN}  Force killing Gunicorn...{RESET}")
+                    _gunicorn_process.kill()
+            else:
+                try:
+                    _gunicorn_process.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    print(f"{WARN}  Force killing Gunicorn...{RESET}")
+                    _gunicorn_process.kill()
+
+        print(f"{GOOD}◼ Shutdown complete{RESET}")
+        sys.stdout.flush()
+        sys.exit(0)
+
+    signal.signal(signal.SIGTERM, shutdown_handler)
+    signal.signal(signal.SIGINT, shutdown_handler)
+
+
+def setup_signal_handlers_debug(app):
+    """Setup graceful shutdown handlers for debug mode (single process)."""
     def shutdown_handler(signum, frame):
         signal_name = "SIGTERM" if signum == signal.SIGTERM else "SIGINT"
         print(f"\n{WARN}◼ Received {signal_name}, shutting down gracefully...{RESET}")
         sys.stdout.flush()
 
-        # Stop the worker thread
+        # In debug mode, we still have the old worker thread
         if hasattr(app, 'stacks_worker') and app.stacks_worker:
             print(f"{INFO}  Stopping download worker...{RESET}")
             sys.stdout.flush()
             app.stacks_worker.stop()
 
-        # Cleanup downloader resources
         if hasattr(app, 'stacks_worker') and app.stacks_worker and hasattr(app.stacks_worker, 'downloader'):
             print(f"{INFO}  Cleaning up downloader...{RESET}")
             sys.stdout.flush()
             app.stacks_worker.downloader.cleanup()
 
-        # Save queue state
         if hasattr(app, 'stacks_queue') and app.stacks_queue:
             print(f"{INFO}  Saving queue state...{RESET}")
             sys.stdout.flush()
@@ -99,7 +172,74 @@ def setup_signal_handlers(app):
     signal.signal(signal.SIGINT, shutdown_handler)
 
 
+def start_worker_processes(config_path: str):
+    """Start the worker processes (coordinator, download workers, scraper)."""
+    global _process_manager
+
+    print(f"{INFO}◼ Starting worker processes ({DOWNLOAD_WORKERS} download workers)...{RESET}")
+    sys.stdout.flush()
+
+    from stacks.coordinator.process_manager import ProcessManager
+
+    _process_manager = ProcessManager(Path(config_path))
+    _process_manager.start_all()
+
+    print(f"{GOOD}  Worker processes started{RESET}")
+    sys.stdout.flush()
+
+
+def _run_gunicorn_pex():
+    """Run gunicorn from within PEX (called in subprocess)."""
+    from gunicorn.app.wsgiapp import run
+    sys.argv = [
+        "gunicorn",
+        "--config", "python:stacks.gunicorn_config",
+        "stacks.server.webserver:create_app()"
+    ]
+    run()
+
+
+def start_gunicorn(config_path: str):
+    """Start Gunicorn as a subprocess."""
+    global _gunicorn_process
+
+    print(f"{INFO}◼ Starting Gunicorn web server...{RESET}")
+    sys.stdout.flush()
+
+    # Set config path as environment variable for gunicorn workers
+    os.environ["STACKS_CONFIG_PATH"] = config_path
+
+    # Check if running from source or PEX
+    if GUNICORN_CONFIG_FILE.exists():
+        # Running from source - use subprocess with gunicorn command
+        env = os.environ.copy()
+        src_path = str(PROJECT_ROOT / "src")
+        current_pythonpath = env.get("PYTHONPATH", "")
+        if current_pythonpath:
+            env["PYTHONPATH"] = f"{src_path}:{current_pythonpath}"
+        else:
+            env["PYTHONPATH"] = src_path
+
+        gunicorn_cmd = [
+            "gunicorn",
+            "--config", str(GUNICORN_CONFIG_FILE),
+            "stacks.server.webserver:create_app()"
+        ]
+        _gunicorn_process = subprocess.Popen(gunicorn_cmd, env=env)
+        print(f"{GOOD}  Gunicorn started (PID: {_gunicorn_process.pid}){RESET}")
+    else:
+        # Running from PEX - use multiprocessing to run bundled gunicorn
+        _gunicorn_process = multiprocessing.Process(target=_run_gunicorn_pex)
+        _gunicorn_process.start()
+        print(f"{GOOD}  Gunicorn started (PID: {_gunicorn_process.pid}){RESET}")
+
+    sys.stdout.flush()
+    return _gunicorn_process
+
+
 def main():
+    global _process_manager, _gunicorn_process
+
     parser = argparse.ArgumentParser(description="Start the Stacks server.")
     parser.add_argument(
         "-c", "--config",
@@ -138,8 +278,12 @@ def main():
     debug_mode = args.debug or os.environ.get("FLASK_DEBUG", "").lower() in ("1", "true")
 
     if debug_mode:
+        # Debug mode: use old single-process architecture with Flask dev server
         print(f"{WARN}◼ Debug mode enabled - using Flask development server{RESET}")
+        print(f"{WARN}  (Multi-process workers disabled in debug mode){RESET}")
         sys.stdout.flush()
+
+        from stacks.server.webserver import create_app
 
         print("◼ Starting Stacks...")
         sys.stdout.flush()
@@ -147,49 +291,72 @@ def main():
         app = create_app(config_path, debug_mode=debug_mode)
 
         # Setup graceful shutdown handlers
-        setup_signal_handlers(app)
+        setup_signal_handlers_debug(app)
 
         host = app.stacks_host
         port = app.stacks_port
 
         app.run(host, port, debug=debug_mode, use_reloader=False)
     else:
-        print(f"{INFO}◼ Starting Stacks with Gunicorn...{RESET}")
+        # Production mode: multi-process architecture
+        print(f"{INFO}◼ Starting Stacks in multi-process mode...{RESET}")
         sys.stdout.flush()
 
-        # Set config path as environment variable for gunicorn workers
-        os.environ["STACKS_CONFIG_PATH"] = config_path
+        # Initialize database first
+        init_database()
 
-        # Check if running from source or PEX
-        if GUNICORN_CONFIG_FILE.exists():
-            # Running from source - use file path and set PYTHONPATH
-            current_pythonpath = os.environ.get("PYTHONPATH", "")
-            src_path = str(PROJECT_ROOT / "src")
-            if current_pythonpath:
-                os.environ["PYTHONPATH"] = f"{src_path}:{current_pythonpath}"
-            else:
-                os.environ["PYTHONPATH"] = src_path
+        # Setup signal handlers before starting processes
+        setup_signal_handlers_multiprocess()
 
-            gunicorn_cmd = [
-                "gunicorn",
-                "--config", str(GUNICORN_CONFIG_FILE),
-                "stacks.server.webserver:create_app()"
-            ]
-            # Execute gunicorn, replacing current process
-            os.execvp("gunicorn", gunicorn_cmd)
-        else:
-            # Running from PEX - import and run gunicorn directly
-            from gunicorn.app.wsgiapp import run
-            sys.argv = [
-                "gunicorn",
-                "--config", "python:stacks.gunicorn_config",
-                "stacks.server.webserver:create_app()"
-            ]
-            run()
+        # Start worker processes
+        start_worker_processes(config_path)
+
+        # Start Gunicorn
+        gunicorn_proc = start_gunicorn(config_path)
+
+        print(f"{GOOD}◼ Stacks is running!{RESET}")
+        sys.stdout.flush()
+
+        # Monitor loop: restart dead workers and wait for Gunicorn to exit
+        try:
+            while True:
+                # Check if Gunicorn is still running
+                if isinstance(gunicorn_proc, multiprocessing.Process):
+                    if not gunicorn_proc.is_alive():
+                        exit_code = gunicorn_proc.exitcode
+                        print(f"{INFO}◼ Gunicorn exited with code {exit_code}{RESET}")
+                        break
+                else:
+                    ret = gunicorn_proc.poll()
+                    if ret is not None:
+                        print(f"{INFO}◼ Gunicorn exited with code {ret}{RESET}")
+                        break
+
+                # Restart any worker processes that have died unexpectedly
+                if _process_manager:
+                    restarted = _process_manager.restart_dead_processes()
+                    if restarted:
+                        print(f"{WARN}  Restarted {restarted} dead worker process(es){RESET}")
+                        sys.stdout.flush()
+
+                import time
+                time.sleep(5)
+
+            # If Gunicorn exits, stop workers too
+            if _process_manager:
+                print(f"{INFO}  Stopping worker processes...{RESET}")
+                _process_manager.stop_all()
+
+        except KeyboardInterrupt:
+            # Signal handler will take care of cleanup
+            pass
+
 
 if __name__ == "__main__":
     try:
         main()
     except Exception as e:
         print(f"\nError during startup: {e}", file=sys.stderr)
+        import traceback
+        traceback.print_exc()
         sys.exit(1)

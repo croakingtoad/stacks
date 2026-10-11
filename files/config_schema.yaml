@@ -84,6 +84,23 @@ flaresolverr:
     min: 10
     max: 600
 
+proxy:
+  enabled:
+    types: [BOOL]
+    default: false
+  url:
+    types: [URL, NULL]
+    default: null
+    max_length: 256
+  username:
+    types: [STRING, NULL]
+    default: null
+    max_length: 128
+  password:
+    types: [STRING, NULL]
+    default: null
+    max_length: 128
+
 queue:
   max_history:
     types: [INTEGER]

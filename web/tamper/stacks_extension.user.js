@@ -1,13 +1,11 @@
 // ==UserScript==
 // @name         Stacks - Anna's Archive Downloader
 // @namespace    http://tampermonkey.net/
-// @version      1.2.1
+// @version      1.3.0
 // @description  Add download buttons to Anna's Archive that queue downloads to Stacks server
 // @author       Zelest Carlyone
-// @match        https://annas-archive.pk/*
-// @match        https://annas-archive.pm/*
-// @match        https://annas-archive.in/*
-// @icon         https://annas-archive.pk/favicon.ico
+// @include      https://annas-archive.*/*
+// @icon         https://annas-archive.gl/favicon.ico
 // @grant        GM_xmlhttpRequest
 // @grant        GM_getValue
 // @grant        GM_setValue

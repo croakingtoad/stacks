@@ -67,6 +67,7 @@ You can deploy it with either **Docker Compose** or the **Docker CLI**.
           - "7788:7788"
         volumes:
           # REQUIRED - change these paths to match your system
+          # For Windows, use / instead of \, for instance C:/path/to/downloads
           - /path/to/config:/opt/stacks/config # Configuration files
           - /path/to/download:/opt/stacks/download # Downloaded files
           - /path/to/logs:/opt/stacks/logs # Log files

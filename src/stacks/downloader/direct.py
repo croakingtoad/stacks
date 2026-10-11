@@ -106,28 +106,27 @@ def download_direct(d, download_url, title=None, total_size=None, supports_resum
                             f.write(chunk)
                             downloaded += len(chunk)
 
-                            if d.progress_callback and total_size:
+                            # Always call progress_callback every 0.5 s so heartbeats and
+                            # cancellation work even when Content-Length is not known.
+                            if d.progress_callback:
                                 current_time = time.time()
                                 time_diff = current_time - last_update_time
 
-                                # Update speed every 0.5 seconds to avoid excessive updates
                                 if time_diff >= 0.5:
                                     bytes_diff = downloaded - last_downloaded
                                     current_speed = bytes_diff / time_diff
 
-                                    # Keep last 5 samples for smoothing
                                     speed_samples.append(current_speed)
                                     if len(speed_samples) > 5:
                                         speed_samples.pop(0)
 
-                                    # Average speed for smoother display
                                     avg_speed = sum(speed_samples) / len(speed_samples)
 
-                                    percent = (downloaded / total_size) * 100
+                                    percent = round((downloaded / total_size) * 100, 1) if total_size else 0
                                     should_continue = d.progress_callback({
                                         'total_size': total_size,
                                         'downloaded': downloaded,
-                                        'percent': round(percent, 1),
+                                        'percent': percent,
                                         'speed': int(avg_speed)
                                     })
 
@@ -153,15 +152,13 @@ def download_direct(d, download_url, title=None, total_size=None, supports_resum
                     if file_md5.lower() != md5.lower():
                         d.logger.error(f"MD5 mismatch: expected {md5}, got {file_md5}")
                         if hasattr(d, 'status_callback'):
-                            d.status_callback("MD5 verification failed - file corrupted")
-                        # Reset progress to 0%
-                        if d.progress_callback:
-                            d.progress_callback({
-                                'total_size': 0,
-                                'downloaded': 0,
-                                'percent': 0
-                            })
-                        temp_path.unlink()
+                            d.status_callback("MD5 verification failed - keeping file for debugging")
+                        # DEBUG: Keep the file for inspection instead of deleting
+                        # temp_path.unlink()
+                        # Move to final location with _MISMATCH suffix for debugging
+                        debug_path = final_path.with_suffix(f".MISMATCH{final_path.suffix}")
+                        shutil.move(str(temp_path), str(debug_path))
+                        d.logger.warning(f"Kept mismatched file for debugging: {debug_path}")
                         return None
                     d.logger.info("MD5 checksum verified")
 

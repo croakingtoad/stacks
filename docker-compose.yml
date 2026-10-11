@@ -14,6 +14,7 @@ services:
       - "7788:7788"
     volumes:
       # REQUIRED: Change these paths to match your system
+      # For Windows, use / instead of \, for instance C:/path/to/downloads
       - "/path/to/config:/opt/stacks/config"       # Configuration folder
       - "/path/to/download:/opt/stacks/download"   # Downloaded files
       - "/path/to/logs:/opt/stacks/logs"           # Log files

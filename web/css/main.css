@@ -771,6 +771,26 @@ footer a:hover {
   display: block;
 }
 
+.item-filetype {
+  display: none;
+  padding: 2px 6px;
+  background: #bd93f9;
+  color: #282a36;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.item-status {
+  display: none;
+  padding: 2px 6px;
+  background: #ffb86c;
+  color: #282a36;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
 .item-subfolder {
   display: none;
   margin-left: 8px;

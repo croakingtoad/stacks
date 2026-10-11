@@ -1,3 +1,13 @@
+"""
+LEGACY MODULE - Debug Mode Only
+
+This module provides the single-threaded download worker used in debug mode.
+In production (multi-process mode), downloads are handled by:
+    stacks.coordinator.download_worker.download_worker_process
+
+This file is kept for backwards compatibility with debug mode development.
+"""
+
 import threading
 import logging
 import time
@@ -5,6 +15,7 @@ from datetime import datetime
 from pathlib import Path
 from stacks.downloader.downloader import AnnaDownloader
 from stacks.constants import DOWNLOAD_PATH, PROJECT_ROOT
+
 
 class DownloadWorker:
     def __init__(self, queue, config):
@@ -76,6 +87,14 @@ class DownloadWorker:
         incomplete_folder_path = self.config.get('downloads', 'incomplete_folder_path', default='/download/incomplete')
         incomplete_dir = PROJECT_ROOT / incomplete_folder_path.lstrip('/')
 
+        # Get proxy config
+        proxy_config = {
+            'enabled': self.config.get('proxy', 'enabled', default=False),
+            'url': self.config.get('proxy', 'url'),
+            'username': self.config.get('proxy', 'username'),
+            'password': self.config.get('proxy', 'password')
+        }
+
         # Pass None if FlareSolverr is disabled, otherwise pass the URL
         self.downloader = AnnaDownloader(
             output_dir=DOWNLOAD_PATH,
@@ -86,7 +105,8 @@ class DownloadWorker:
             flaresolverr_url=flaresolverr_url if flaresolverr_enabled else None,
             flaresolverr_timeout=flaresolverr_timeout_ms,
             prefer_title_naming=prefer_title_naming,
-            include_hash=include_hash
+            include_hash=include_hash,
+            proxy_config=proxy_config
         )
         
         # Test fast download key if enabled and key is present

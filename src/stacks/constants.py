@@ -28,9 +28,10 @@ RESERVED_PATHS = ['/logs', '/config', '/files', '/cache', '/web']
 
 # Anna's Archive Domains (rotating fallbacks)
 ANNAS_ARCHIVE_DOMAINS = [
+    "annas-archive.gl",
+    "annas-archive.vg",
     "annas-archive.pk",
-    "annas-archive.pm",
-    "annas-archive.in"
+    "annas-archive.gd"
 ]
 
 # Domain state file (tracks which domain worked last)
@@ -62,6 +63,13 @@ RE_SECRET_KEY = re.compile(r"^[A-Za-z0-9_-]{32}$")
 
 # Known MD5 for testing
 KNOWN_MD5 = "d6e1dc51a50726f00ec438af21952a45"
+
+# Multi-process download worker configuration
+DOWNLOAD_WORKERS = 1      # Number of concurrent download worker processes (Anna's Archive rate-limits by IP)
+SCRAPER_WORKERS = 1       # Number of scraper worker processes (keep at 1)
+WORKER_HEARTBEAT_INTERVAL = 10  # Seconds between worker heartbeats
+WORKER_TIMEOUT = 120      # Seconds before a worker is considered dead (downloads can be slow)
+DATABASE_BUSY_TIMEOUT = 30000  # Milliseconds for SQLite busy timeout
 
 # Cache busting
 TIMESTAMP = time.time()

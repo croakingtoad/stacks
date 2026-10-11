@@ -507,6 +507,12 @@ function loadSettings() {
       document.getElementById("setting-flaresolverr-url").value = config.flaresolverr?.url || "http://localhost:8191";
       document.getElementById("setting-flaresolverr-timeout").value = config.flaresolverr?.timeout || 60;
 
+      // Proxy
+      document.getElementById("setting-proxy-enabled").checked = !!config.proxy?.enabled;
+      document.getElementById("setting-proxy-url").value = config.proxy?.url || "";
+      document.getElementById("setting-proxy-username").value = config.proxy?.username || "";
+      document.getElementById("setting-proxy-password").value = config.proxy?.password || "";
+
       // Queue
       document.getElementById("setting-max-history").value = config.queue?.max_history || 100;
 
@@ -540,6 +546,12 @@ function saveSettings() {
       enabled: document.getElementById("setting-flaresolverr-enabled").checked,
       url: document.getElementById("setting-flaresolverr-url").value || "http://localhost:8191",
       timeout: parseInt(document.getElementById("setting-flaresolverr-timeout").value) || 60,
+    },
+    proxy: {
+      enabled: document.getElementById("setting-proxy-enabled").checked,
+      url: document.getElementById("setting-proxy-url").value || null,
+      username: document.getElementById("setting-proxy-username").value || null,
+      password: document.getElementById("setting-proxy-password").value || null,
     },
     queue: {
       max_history: parseInt(document.getElementById("setting-max-history").value),
@@ -764,6 +776,52 @@ function testFlaresolverr() {
     });
 }
 
+function testProxy() {
+  const url = document.getElementById("setting-proxy-url").value;
+  const username = document.getElementById("setting-proxy-username").value;
+  const password = document.getElementById("setting-proxy-password").value;
+  const resultDiv = document.getElementById("proxy-test-result");
+
+  if (!url) {
+    resultDiv.className = "test-result error";
+    resultDiv.textContent = "Please enter a proxy URL first";
+    resultDiv.style.display = "block";
+    return;
+  }
+
+  resultDiv.className = "test-result";
+  resultDiv.textContent = "Testing connection...";
+  resultDiv.style.display = "block";
+
+  apiFetch("/api/config/test_proxy", {
+    method: "POST",
+    body: JSON.stringify({ url: url, username: username || null, password: password || null }),
+  })
+    .then((r) => r.json())
+    .then((data) => {
+      if (data.success) {
+        resultDiv.className = "test-result success";
+        const icon = document.createElement("span");
+        icon.setAttribute("data-icon", "check");
+        resultDiv.textContent = ` ${data.message}`;
+        resultDiv.prepend(icon);
+      } else {
+        resultDiv.className = "test-result error";
+        const icon = document.createElement("span");
+        icon.setAttribute("data-icon", "close");
+        resultDiv.textContent = ` ${data.error}`;
+        resultDiv.prepend(icon);
+      }
+    })
+    .catch((err) => {
+      resultDiv.className = "test-result error";
+      const icon = document.createElement("span");
+      icon.setAttribute("data-icon", "close");
+      resultDiv.textContent = ` Connection error: ${err.message}`;
+      resultDiv.prepend(icon);
+    });
+}
+
 // ============================================================================
 // UI UPDATE FUNCTIONS
 // ============================================================================
@@ -786,11 +844,31 @@ function updateQueueList(queue) {
   queue.forEach((item) => {
     const clone = template.content.cloneNode(true);
 
-    clone.querySelector(".item-title-text").textContent = item.md5;
+    // Title: prefer title, then filename, fall back to MD5
+    const displayName = item.title || item.filename || item.md5;
+    clone.querySelector(".item-title-text").textContent = displayName;
+
+    // MD5 always shown below the title
     clone.querySelector(".item-md5").textContent = item.md5;
     clone.querySelector(".item-time").textContent = "Added: " + formatTime(item.added_at);
 
-    // Show subfolder tag if present
+    // File type badge from filename extension
+    const filetypeTag = clone.querySelector(".item-filetype");
+    const nameForExt = item.filename || item.title || "";
+    const dotIdx = nameForExt.lastIndexOf(".");
+    if (dotIdx !== -1 && dotIdx < nameForExt.length - 1) {
+      filetypeTag.textContent = nameForExt.slice(dotIdx + 1).toUpperCase();
+      filetypeTag.style.display = "inline";
+    }
+
+    // Status badge for items not yet ready to download
+    const statusTag = clone.querySelector(".item-status");
+    if (item.status === "pending_scrape" || item.status === "scraping") {
+      statusTag.textContent = "Fetching info...";
+      statusTag.style.display = "inline";
+    }
+
+    // Subfolder tag
     const subfolderTag = clone.querySelector(".item-subfolder");
     if (item.subfolder) {
       subfolderTag.textContent = item.subfolder.split("/").pop();
@@ -831,7 +909,7 @@ function updateHistoryList(history) {
       statusIcon.setAttribute("data-icon", "close");
       statusIcon.className = "item-status-icon error-icon";
     }
-    clone.querySelector(".item-link").href = "https://annas-archive.pk/md5/" + item.md5;
+    clone.querySelector(".item-link").href = "https://annas-archive.gl/md5/" + item.md5;
     // Title - filename or MD5
     const displayName = item.filename || item.md5;
     clone.querySelector(".item-title-text").textContent = displayName;

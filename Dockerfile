@@ -50,6 +50,9 @@ WORKDIR /opt/stacks
 # Set PROJECT_ROOT for the application
 ENV STACKS_PROJECT_ROOT=/opt/stacks
 
+# Set PEX cache directory to avoid warnings and improve startup performance
+ENV PEX_ROOT=/tmp/pex
+
 # Copy application and files
 COPY --from=builder /opt/stacks/ /opt/stacks/
 

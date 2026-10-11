@@ -90,3 +90,25 @@ class UILogHandler(logging.Handler):
             LOG_BUFFER.append(msg)
         except Exception:
             pass
+
+
+def get_log_file_path() -> Path:
+    """Return today's log file path (same formula as setup_logging)."""
+    return Path(LOG_PATH) / f"log-{datetime.now().strftime('%Y-%m-%d')}.log"
+
+
+def get_recent_logs(n: int = LOG_VIEW_LENGTH) -> list:
+    """
+    Read the last n lines from the shared log file.
+    Worker processes write to this file so their logs appear here too.
+    Falls back to LOG_BUFFER if the file is not available (e.g. debug mode).
+    """
+    log_file = get_log_file_path()
+    if log_file.exists():
+        try:
+            with open(log_file, 'r', encoding='utf-8', errors='replace') as f:
+                lines = f.readlines()
+            return [line.rstrip('\n') for line in lines[-n:]]
+        except Exception:
+            pass
+    return list(LOG_BUFFER)

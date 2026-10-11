@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.3.0]
+
+### Features
+- Changed annas-archive*.gl* to be the new main site, added *.vg*, *.pk*, *.gd* as backup domains.
+- Added a new way of finding mirrors which updates itself with links from Wikipedia, thank you @DeanRickles for implementation suggestion!
+- Added proxy support
+
+### Architecture
+- Rewrote the entire queue-system from scratch. Now the system is divided into a bunch of workers, one gathering metadata, one managing the queue, one managing the downloads. This is a start of trying to make multiple downloads work at the same time from different mirrors.
+
+### Bugfixes
+- Added temp folder for pex to make startup a wee bit faster and surpress warning messages
+
 ## [1.2.1]
 
 ### Bugfixes

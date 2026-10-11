@@ -30,6 +30,11 @@ def index():
 
 @api_bp.route("/login", methods=["GET", "POST"])
 def login():
+    # If auth is disabled, skip login entirely
+    config = current_app.stacks_config
+    if config.get("login", "disable"):
+        return redirect(url_for("api.index"))
+
     # Already logged in?
     if session.get("logged_in"):
         return redirect(url_for("api.index"))

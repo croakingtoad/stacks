@@ -1,9 +1,20 @@
+"""
+LEGACY MODULE - Debug Mode Only
+
+This module provides the single-process queue implementation used in debug mode.
+In production (multi-process mode), queue operations use SQLite via:
+    stacks.coordinator.queue_ops.QueueOperations
+
+This file is kept for backwards compatibility with debug mode development.
+"""
+
 import threading
 from pathlib import Path
 import json
 import logging
 from datetime import datetime
 from stacks.constants import QUEUE_FILE
+
 
 class DownloadQueue:
     def __init__(self, config):

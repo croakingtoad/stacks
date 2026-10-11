@@ -5,22 +5,30 @@ from stacks.constants import ANNAS_ARCHIVE_DOMAINS, DOMAIN_STATE_FILE, CONFIG_PA
 logger = logging.getLogger(__name__)
 
 
+def get_all_domains():
+    """Get all Anna's Archive domains: hardcoded list plus any extras found via Wikipedia."""
+    from stacks.utils.domainupdater import get_wiki_mirrors
+    extras = get_wiki_mirrors()
+    return ANNAS_ARCHIVE_DOMAINS + [d for d in extras if d not in ANNAS_ARCHIVE_DOMAINS]
+
+
 def get_working_domain():
     """Get the last known working Anna's Archive domain, or the first one if none saved."""
+    all_domains = get_all_domains()
     try:
         if DOMAIN_STATE_FILE.exists():
             with open(DOMAIN_STATE_FILE, 'r') as f:
                 data = json.load(f)
                 domain = data.get('last_working_domain')
-                if domain and domain in ANNAS_ARCHIVE_DOMAINS:
+                if domain and domain in all_domains:
                     logger.debug(f"Using last known working domain: {domain}")
                     return domain
     except Exception as e:
         logger.debug(f"Failed to load working domain: {e}")
 
     # Default to first domain
-    logger.debug(f"Using default domain: {ANNAS_ARCHIVE_DOMAINS[0]}")
-    return ANNAS_ARCHIVE_DOMAINS[0]
+    logger.debug(f"Using default domain: {all_domains[0]}")
+    return all_domains[0]
 
 
 def save_working_domain(domain):
@@ -36,20 +44,16 @@ def save_working_domain(domain):
 
 def get_next_domain(current_domain):
     """Get the next domain in the rotation after the current one."""
+    all_domains = get_all_domains()
     try:
-        current_index = ANNAS_ARCHIVE_DOMAINS.index(current_domain)
-        next_index = (current_index + 1) % len(ANNAS_ARCHIVE_DOMAINS)
-        next_domain = ANNAS_ARCHIVE_DOMAINS[next_index]
+        current_index = all_domains.index(current_domain)
+        next_index = (current_index + 1) % len(all_domains)
+        next_domain = all_domains[next_index]
         logger.debug(f"Rotating from {current_domain} to {next_domain}")
         return next_domain
     except (ValueError, IndexError):
         logger.debug(f"Invalid current domain {current_domain}, using default")
-        return ANNAS_ARCHIVE_DOMAINS[0]
-
-
-def get_all_domains():
-    """Get all available Anna's Archive domains."""
-    return ANNAS_ARCHIVE_DOMAINS.copy()
+        return all_domains[0]
 
 
 def try_domains_until_success(func, *args, **kwargs):
@@ -71,13 +75,15 @@ def try_domains_until_success(func, *args, **kwargs):
     Raises:
         The last exception encountered if all domains fail
     """
+    all_domains = get_all_domains()
+
     # Start with the last working domain
     current_domain = get_working_domain()
     tried_domains = []
     last_error = None
 
     # Try all domains
-    for _ in range(len(ANNAS_ARCHIVE_DOMAINS)):
+    for _ in range(len(all_domains)):
         if current_domain in tried_domains:
             current_domain = get_next_domain(current_domain)
             continue

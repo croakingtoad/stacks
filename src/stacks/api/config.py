@@ -69,7 +69,87 @@ def api_config_test_flaresolverr():
             'success': False,
             'error': f'Connection failed: {str(e)}'
         }), 500
-    
+
+
+@api_bp.route('/api/config/test_proxy', methods=['POST'])
+@require_auth_with_permissions(allow_downloader=False)
+def api_config_test_proxy():
+    """Test proxy connection"""
+    data = request.json
+    proxy_url = data.get('url')
+    username = data.get('username')
+    password = data.get('password')
+
+    if not proxy_url:
+        return jsonify({
+            'success': False,
+            'error': 'No proxy URL provided'
+        }), 400
+
+    # Normalize URL: add http:// if no scheme is present
+    if not proxy_url.startswith(('http://', 'https://', 'socks5://')):
+        proxy_url = f"http://{proxy_url}"
+
+    # Build proxy URL with authentication if provided
+    if username and password:
+        from urllib.parse import urlparse, urlunparse
+        parsed = urlparse(proxy_url)
+        proxy_url = urlunparse((
+            parsed.scheme,
+            f"{username}:{password}@{parsed.netloc}",
+            parsed.path, parsed.params, parsed.query, parsed.fragment
+        ))
+
+    try:
+        import requests
+
+        proxies = {
+            'http': proxy_url,
+            'https': proxy_url
+        }
+
+        # Test by making a request to a reliable endpoint
+        response = requests.get(
+            'https://httpbin.org/ip',
+            proxies=proxies,
+            timeout=10
+        )
+
+        if response.status_code == 200:
+            result = response.json()
+            return jsonify({
+                'success': True,
+                'message': f'Proxy is working. External IP: {result.get("origin", "unknown")}',
+                'external_ip': result.get('origin')
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': f'Proxy returned status {response.status_code}'
+            }), 400
+
+    except requests.exceptions.Timeout:
+        return jsonify({
+            'success': False,
+            'error': 'Connection timeout after 10 seconds'
+        }), 408
+    except requests.exceptions.ProxyError as e:
+        return jsonify({
+            'success': False,
+            'error': f'Proxy error: {str(e)}'
+        }), 503
+    except requests.exceptions.ConnectionError:
+        return jsonify({
+            'success': False,
+            'error': 'Could not connect through proxy. Check the URL and credentials.'
+        }), 503
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'Connection failed: {str(e)}'
+        }), 500
+
+
 def _test_key_single_domain(test_key, domain):
     """Test fast download key with a specific domain."""
     import requests
@@ -204,8 +284,8 @@ def api_config_update():
         if new_incomplete_path and new_incomplete_path != old_incomplete_path:
             logger.info(f"Incomplete folder path changed from {old_incomplete_path} to {new_incomplete_path}")
 
-            # Stop active downloads and wait for them to finish
-            if worker.queue.current_download:
+            # Stop active downloads and wait for them to finish (debug/single-process mode only)
+            if worker is not None and worker.queue.current_download:
                 logger.info("Cancelling active download for migration")
                 worker.pause()  # Pause queue to prevent new downloads
                 worker.cancel_and_requeue_current()  # Cancel current download
@@ -241,12 +321,13 @@ def api_config_update():
         # Save config
         config.save()
 
-        # Recreate downloader with new config (this will use the new path)
-        worker.update_config()
+        # Recreate downloader with new config (debug/single-process mode only)
+        if worker is not None:
+            worker.update_config()
         setup_logging(config)
 
         # Resume worker if we paused it
-        if migration_occurred and worker.paused:
+        if migration_occurred and worker is not None and worker.paused:
             worker.resume()
 
         import copy

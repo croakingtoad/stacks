@@ -15,7 +15,8 @@ from stacks.downloader.utils import get_unique_filename
 class AnnaDownloader:
     def __init__(self, output_dir="./downloads", incomplete_dir=None, progress_callback=None,
                  fast_download_config=None, flaresolverr_url=None, flaresolverr_timeout=60000,
-                 status_callback=None, prefer_title_naming=False, include_hash="none"):
+                 status_callback=None, prefer_title_naming=False, include_hash="none",
+                 proxy_config=None):
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -29,6 +30,26 @@ class AnnaDownloader:
         self.session.headers.update({
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
         })
+
+        # Proxy configuration
+        self.proxy_config = proxy_config or {}
+        if self.proxy_config.get('enabled') and self.proxy_config.get('url'):
+            proxy_url = self.proxy_config['url']
+            # Add authentication if provided
+            if self.proxy_config.get('username') and self.proxy_config.get('password'):
+                # Insert credentials into proxy URL
+                from urllib.parse import urlparse, urlunparse
+                parsed = urlparse(proxy_url)
+                proxy_url = urlunparse((
+                    parsed.scheme,
+                    f"{self.proxy_config['username']}:{self.proxy_config['password']}@{parsed.netloc}",
+                    parsed.path, parsed.params, parsed.query, parsed.fragment
+                ))
+            self.session.proxies = {
+                'http': proxy_url,
+                'https': proxy_url
+            }
+
         self.logger = logging.getLogger('stacks_downloader')
         self.progress_callback = progress_callback
         self.status_callback = status_callback
@@ -65,6 +86,9 @@ class AnnaDownloader:
             self.logger.info("Using ALL download sources (Anna's Archive slow_download + external mirrors)")
         else:
             self.logger.info("FlareSolverr not configured - using external mirrors and slow_download with cached cookies")
+
+        if self.proxy_config.get('enabled') and self.proxy_config.get('url'):
+            self.logger.info(f"Proxy enabled: {self.proxy_config['url']}")
 
         # Always try to load cached cookies (useful for slow_download even without FlareSolverr)
         self.load_cached_cookies()
