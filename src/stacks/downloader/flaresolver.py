@@ -1,5 +1,9 @@
+import re
 from urllib.parse import urlparse
 from requests import Timeout
+
+# Page titles DDoS-Guard and Cloudflare show while a challenge is unsolved
+CHALLENGE_TITLES = ('ddos-guard', 'just a moment')
 
 def solve_with_flaresolverr(d, url):
     """Use FlareSolverr to bypass DDoS-Guard/Cloudflare protection."""
@@ -29,7 +33,13 @@ def solve_with_flaresolverr(d, url):
             cookies_list = solution.get('cookies', [])
             cookies_dict = {cookie['name']: cookie['value'] for cookie in cookies_list}
             html_content = solution.get('response')
-            
+
+            # FlareSolverr reports "ok" even when the site escalates to a manual check
+            title = re.search(r'<title>(.*?)</title>', html_content or '', re.IGNORECASE | re.DOTALL)
+            if title and any(t in title.group(1).lower() for t in CHALLENGE_TITLES):
+                d.logger.error(f"FlareSolverr: still on challenge page ({title.group(1).strip()})")
+                return False, {}, None
+
             d.logger.info(f"FlareSolverr: Success - got {len(cookies_dict)} cookies")
 
             # Extract domain from URL

@@ -128,9 +128,17 @@ def _get_download_links_single_domain(d, md5, domain):
 
     try:
         response = d.session.get(url, timeout=30)
-        response.raise_for_status()
 
-        soup = BeautifulSoup(response.text, 'html.parser')
+        if response.status_code in [403, 503] and d.flaresolverr_url:
+            d.logger.warning(f"Got {response.status_code} from {domain}, solving challenge with FlareSolverr...")
+            success, _, html_content = d.solve_with_flaresolverr(url)
+            if not success:
+                raise Exception(f"FlareSolverr could not get past the challenge on {domain}")
+        else:
+            response.raise_for_status()
+            html_content = response.text
+
+        soup = BeautifulSoup(html_content, 'html.parser')
 
         # Helper function to extract filename from Filepath metadata
         def extract_from_filepath():
