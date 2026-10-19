@@ -10,7 +10,7 @@ from stacks.constants import KNOWN_MD5, PROJECT_ROOT
 from . import api_bp
 from stacks.utils.logutils import setup_logging
 from stacks.utils.migrationutils import migrate_incomplete_folder
-from stacks.utils.domainutils import try_domains_until_success
+from stacks.utils.domainutils import try_domains_until_success, save_preferred_domain
 from stacks.security.auth import (
     require_auth_with_permissions,
     hash_password,
@@ -320,6 +320,9 @@ def api_config_update():
 
         # Save config
         config.save()
+
+        # Sync preferred domain to state file so domainutils picks it up immediately
+        save_preferred_domain(config.get('annas_archive', 'preferred_domain'))
 
         # Recreate downloader with new config (debug/single-process mode only)
         if worker is not None:

@@ -5,41 +5,83 @@ from stacks.constants import ANNAS_ARCHIVE_DOMAINS, DOMAIN_STATE_FILE, CONFIG_PA
 logger = logging.getLogger(__name__)
 
 
-def get_all_domains():
-    """Get all Anna's Archive domains: hardcoded list plus any extras found via Wikipedia."""
-    from stacks.utils.domainupdater import get_wiki_mirrors
-    extras = get_wiki_mirrors()
-    return ANNAS_ARCHIVE_DOMAINS + [d for d in extras if d not in ANNAS_ARCHIVE_DOMAINS]
-
-
-def get_working_domain():
-    """Get the last known working Anna's Archive domain, or the first one if none saved."""
-    all_domains = get_all_domains()
+def _read_domain_state():
+    """Read the domain state file, returning an empty dict on any error."""
     try:
         if DOMAIN_STATE_FILE.exists():
             with open(DOMAIN_STATE_FILE, 'r') as f:
-                data = json.load(f)
-                domain = data.get('last_working_domain')
-                if domain and domain in all_domains:
-                    logger.debug(f"Using last known working domain: {domain}")
-                    return domain
+                return json.load(f)
     except Exception as e:
-        logger.debug(f"Failed to load working domain: {e}")
+        logger.debug(f"Failed to read domain state: {e}")
+    return {}
 
-    # Default to first domain
+
+def _write_domain_state(data):
+    """Write data to the domain state file (merges with existing state)."""
+    try:
+        CONFIG_PATH.mkdir(parents=True, exist_ok=True)
+        existing = _read_domain_state()
+        existing.update(data)
+        with open(DOMAIN_STATE_FILE, 'w') as f:
+            json.dump(existing, f)
+    except Exception as e:
+        logger.debug(f"Failed to write domain state: {e}")
+
+
+def get_all_domains():
+    """Get all Anna's Archive domains: hardcoded list plus any extras found via Wikipedia.
+
+    The user's preferred_domain (if set) is guaranteed to be in the list even if it
+    is not in the hardcoded fallback list, so it can be tried during rotation.
+    """
+    from stacks.utils.domainupdater import get_wiki_mirrors
+    extras = get_wiki_mirrors()
+    domains = ANNAS_ARCHIVE_DOMAINS + [d for d in extras if d not in ANNAS_ARCHIVE_DOMAINS]
+    preferred = _read_domain_state().get('preferred_domain')
+    if preferred and preferred not in domains:
+        domains = [preferred] + domains
+    return domains
+
+
+def get_working_domain():
+    """Get the starting domain for rotation.
+
+    Priority: user preferred_domain > last_working_domain > first in list.
+    """
+    all_domains = get_all_domains()
+    state = _read_domain_state()
+    preferred = state.get('preferred_domain')
+    if preferred and preferred in all_domains:
+        logger.debug(f"Using preferred domain: {preferred}")
+        return preferred
+    last = state.get('last_working_domain')
+    if last and last in all_domains:
+        logger.debug(f"Using last known working domain: {last}")
+        return last
     logger.debug(f"Using default domain: {all_domains[0]}")
     return all_domains[0]
 
 
 def save_working_domain(domain):
     """Save the last known working domain to state file."""
+    _write_domain_state({'last_working_domain': domain})
+    logger.info(f"Saved working domain: {domain}")
+
+
+def save_preferred_domain(domain):
+    """Persist the user's preferred domain.  Pass None to clear the preference."""
+    state = _read_domain_state()
+    if domain:
+        state['preferred_domain'] = domain
+    else:
+        state.pop('preferred_domain', None)
     try:
         CONFIG_PATH.mkdir(parents=True, exist_ok=True)
         with open(DOMAIN_STATE_FILE, 'w') as f:
-            json.dump({'last_working_domain': domain}, f)
-        logger.info(f"Saved working domain: {domain}")
+            json.dump(state, f)
+        logger.info(f"Saved preferred domain: {domain}")
     except Exception as e:
-        logger.debug(f"Failed to save working domain: {e}")
+        logger.debug(f"Failed to save preferred domain: {e}")
 
 
 def get_next_domain(current_domain):

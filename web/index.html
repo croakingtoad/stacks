@@ -120,6 +120,7 @@
             <ul>
               <li>Authentification</li>
               <li>Downloads</li>
+              <li>Anna's Archive</li>
               <li>FlareSolverr</li>
               <li>Proxy</li>
               <li>Queue</li>
@@ -245,6 +246,18 @@
 
                   <button class="btn btn-secondary btn--spaced" onclick="testFastKey()">Test Key</button>
                   <div id="key-test-result" class="test-result"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Anna's Archive -->
+            <div class="settings-content" data-setting="anna's archive">
+              <div class="settings-section">
+                <h3>Anna's Archive</h3>
+                <div class="settings-group">
+                  <label for="setting-preferred-domain">Preferred domain</label>
+                  <input type="text" id="setting-preferred-domain" placeholder="e.g. annas-archive.pk (leave blank for auto)" maxlength="64" />
+                  <div class="comment">Force downloads to start with this domain. Useful when your region blocks specific TLDs. Leave blank to use the default rotation. Example: <code>annas-archive.pk</code></div>
                 </div>
               </div>
             </div>

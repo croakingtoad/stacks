@@ -502,6 +502,9 @@ function loadSettings() {
       document.getElementById("setting-fast-enabled").checked = !!config.fast_download?.enabled;
       document.getElementById("setting-fast-key").value = config.fast_download?.key || "";
 
+      // Anna's Archive
+      document.getElementById("setting-preferred-domain").value = config.annas_archive?.preferred_domain || "";
+
       // FlareSolverr
       document.getElementById("setting-flaresolverr-enabled").checked = !!config.flaresolverr?.enabled;
       document.getElementById("setting-flaresolverr-url").value = config.flaresolverr?.url || "http://localhost:8191";
@@ -541,6 +544,9 @@ function saveSettings() {
     fast_download: {
       enabled: document.getElementById("setting-fast-enabled").checked,
       key: document.getElementById("setting-fast-key").value || null,
+    },
+    annas_archive: {
+      preferred_domain: document.getElementById("setting-preferred-domain").value.trim() || null,
     },
     flaresolverr: {
       enabled: document.getElementById("setting-flaresolverr-enabled").checked,

@@ -112,3 +112,9 @@ logging:
   level:
     types: [LOGGING]
     default: "INFO"
+
+annas_archive:
+  preferred_domain:
+    types: [STRING, NULL]
+    default: null
+    max_length: 64
