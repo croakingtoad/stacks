@@ -127,10 +127,23 @@ def _get_download_links_single_domain(d, md5, domain):
     d.logger.debug(f"Fetching download links from {domain}")
 
     try:
-        response = d.session.get(url, timeout=30)
-        response.raise_for_status()
+        html_text = None
+        try:
+            response = d.session.get(url, timeout=30)
+            response.raise_for_status()
+            html_text = response.text
+        except Exception as direct_err:
+            if d.flaresolverr_url:
+                d.logger.info(f"Direct request to {domain} failed ({direct_err}), trying FlareSolverr")
+                fs_ok, _, fs_html = d.solve_with_flaresolverr(url)
+                if fs_ok and fs_html:
+                    html_text = fs_html
+                else:
+                    raise
+            else:
+                raise
 
-        soup = BeautifulSoup(response.text, 'html.parser')
+        soup = BeautifulSoup(html_text, 'html.parser')
 
         # Helper function to extract filename from Filepath metadata
         def extract_from_filepath():
