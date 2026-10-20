@@ -28,27 +28,41 @@ def download_direct(d, download_url, title=None, total_size=None, supports_resum
         subfolder: Subfolder path to save file to (optional)
     """
     try:
-        # Determine filename
+        from stacks.constants import LEGAL_FILES
+
+        def _make_safe(name):
+            return re.sub(r'[<>:"/\\|?*]', '_', name)
+
+        def _ensure_extension(name):
+            ext = Path(name).suffix.lower()
+            if not ext:
+                d.logger.warning(f"Filename has no extension: {name}, adding .epub")
+                return name + '.epub'
+            if ext not in LEGAL_FILES:
+                d.logger.warning(f"Unusual file extension: {ext} (not in known legal files list)")
+            return name
+
+        def _cd_filename(headers):
+            """Extract filename from Content-Disposition header, or None."""
+            cd = headers.get('Content-Disposition', '')
+            if not cd:
+                return None
+            m = re.search(r"filename[^;=\n]*=\s*[\"']?([^\"';\n]+)", cd)
+            if m:
+                name = unquote(m.group(1).strip().strip('"\''))
+                return name if name else None
+            return None
+
+        # Determine filename — may be refined from response headers on first attempt
+        url_fallback = None
         if not title:
             d.logger.warning("No title provided, extracting from URL")
             parsed_url = urlparse(download_url)
-            filename = unquote(Path(parsed_url.path).name)
-            if not filename:
-                filename = 'download.epub'  # Default fallback
+            url_fallback = unquote(Path(parsed_url.path).name) or None
+            filename = _ensure_extension(_make_safe(url_fallback)) if url_fallback else 'download.epub'
         else:
-            # Clean filename (remove invalid characters)
-            filename = re.sub(r'[<>:"/\\|?*]', '_', title)
+            filename = _ensure_extension(_make_safe(title))
 
-        # Validate extension - warn if suspicious but don't modify
-        from stacks.constants import LEGAL_FILES
-        file_ext = Path(filename).suffix.lower()
-
-        if not file_ext:
-            d.logger.warning(f"Filename has no extension: {filename}, adding .epub")
-            filename = filename + '.epub'
-        elif file_ext not in LEGAL_FILES:
-            d.logger.warning(f"Unusual file extension: {file_ext} (not in known legal files list)")
-        
         # Get unique path (with subfolder if specified)
         if subfolder:
             # Create subfolder if it doesn't exist
@@ -59,7 +73,7 @@ def download_direct(d, download_url, title=None, total_size=None, supports_resum
             base_final_path = d.output_dir / filename
         final_path = d.get_unique_filename(base_final_path)
         temp_path = d.incomplete_dir / f"{final_path.name}.part"
-        
+
         # Check for partial download
         downloaded = 0
         if temp_path.exists() and supports_resume:
@@ -81,6 +95,24 @@ def download_direct(d, download_url, title=None, total_size=None, supports_resum
                     downloaded = 0
                     temp_path.unlink(missing_ok=True)
                     response = d.session.get(download_url, stream=True, timeout=30)
+
+                # On a fresh first attempt with no provided title, try to resolve
+                # a real filename from Content-Disposition or the final redirected URL.
+                if attempt == 0 and downloaded == 0 and not title:
+                    better = (_cd_filename(response.headers)
+                               or unquote(Path(urlparse(response.url).path).name)
+                               or None)
+                    if better and better != url_fallback:
+                        new_filename = _ensure_extension(_make_safe(better))
+                        if new_filename != filename:
+                            d.logger.info(f"Resolved filename from response: {new_filename}")
+                            filename = new_filename
+                            if subfolder:
+                                base_final_path = output_dir / filename
+                            else:
+                                base_final_path = d.output_dir / filename
+                            final_path = d.get_unique_filename(base_final_path)
+                            temp_path = d.incomplete_dir / f"{final_path.name}.part"
 
                 # Get total size
                 if total_size is None:

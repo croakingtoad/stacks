@@ -258,9 +258,12 @@ def download_worker_process(
 
                     if fd_success:
                         worker_logger.info("Using fast download")
+                        # Don't pass scraper-fallback "Unknown" filenames; let
+                        # download_direct extract the real name from the URL/headers.
+                        fd_title = None if (title or '').startswith('Unknown (') else title
                         filepath = downloader.download_direct(
                             fd_result,
-                            title=title,
+                            title=fd_title,
                             resume_attempts=resume_attempts,
                             md5=md5,
                             subfolder=subfolder
