@@ -261,12 +261,20 @@ def download_worker_process(
                         # Don't pass scraper-fallback "Unknown" filenames; let
                         # download_direct extract the real name from the URL/headers.
                         fd_title = None if (title or '').startswith('Unknown') else title
+
+                        def _filename_resolved(name):
+                            try:
+                                queue_ops.update_download_filename(md5, name)
+                            except Exception:
+                                pass
+
                         filepath = downloader.download_direct(
                             fd_result,
                             title=fd_title,
                             resume_attempts=resume_attempts,
                             md5=md5,
-                            subfolder=subfolder
+                            subfolder=subfolder,
+                            filename_resolved_callback=_filename_resolved
                         )
                         if filepath:
                             success = True

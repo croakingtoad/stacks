@@ -943,6 +943,20 @@ class QueueOperations:
         finally:
             conn.close()
 
+    def update_download_filename(self, md5: str, filename: str) -> None:
+        """Update the display filename for an active download."""
+        conn = get_connection()
+        try:
+            conn.execute(
+                "UPDATE downloads SET filename = ? WHERE md5 = ? AND status = 'downloading'",
+                (filename, md5)
+            )
+            conn.commit()
+        except Exception:
+            pass
+        finally:
+            conn.close()
+
     def update_download_progress(
         self,
         md5: str,

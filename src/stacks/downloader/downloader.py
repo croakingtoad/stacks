@@ -105,8 +105,8 @@ class AnnaDownloader:
     
     
     # Direct
-    def download_direct(self, download_url, title=None, total_size=None, supports_resume=True, resume_attempts=3, md5=None, subfolder=None):
-        return download_direct(self, download_url, title, total_size, supports_resume, resume_attempts, md5, subfolder)
+    def download_direct(self, download_url, title=None, total_size=None, supports_resume=True, resume_attempts=3, md5=None, subfolder=None, filename_resolved_callback=None):
+        return download_direct(self, download_url, title, total_size, supports_resume, resume_attempts, md5, subfolder, filename_resolved_callback)
     
     
     # Download orchestrator

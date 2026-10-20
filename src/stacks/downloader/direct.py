@@ -14,7 +14,7 @@ def calculate_md5(filepath):
             hash_md5.update(chunk)
     return hash_md5.hexdigest()
 
-def download_direct(d, download_url, title=None, total_size=None, supports_resume=True, resume_attempts=3, md5=None, subfolder=None):
+def download_direct(d, download_url, title=None, total_size=None, supports_resume=True, resume_attempts=3, md5=None, subfolder=None, filename_resolved_callback=None):
     """Download a file directly from a URL with resume support.
 
     Args:
@@ -60,6 +60,8 @@ def download_direct(d, download_url, title=None, total_size=None, supports_resum
             parsed_url = urlparse(download_url)
             url_fallback = unquote(Path(parsed_url.path).name) or None
             filename = _ensure_extension(_make_safe(url_fallback)) if url_fallback else 'download.epub'
+            if filename_resolved_callback and url_fallback:
+                filename_resolved_callback(filename)
         else:
             filename = _ensure_extension(_make_safe(title))
 
@@ -107,6 +109,8 @@ def download_direct(d, download_url, title=None, total_size=None, supports_resum
                         if new_filename != filename:
                             d.logger.info(f"Resolved filename from response: {new_filename}")
                             filename = new_filename
+                            if filename_resolved_callback:
+                                filename_resolved_callback(filename)
                             if subfolder:
                                 base_final_path = output_dir / filename
                             else:
