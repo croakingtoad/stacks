@@ -239,8 +239,13 @@ def download_worker_process(
             used_fast_download = False
 
             try:
-                # Get config values
+                # Get config values (reload so setting changes are picked up)
+                config.load()
                 resume_attempts = config.get('downloads', 'resume_attempts', default=3)
+
+                # Sync fast_download settings from live config onto existing downloader
+                downloader.fast_download_enabled = config.get('fast_download', 'enabled', default=False)
+                downloader.fast_download_key = config.get('fast_download', 'key')
 
                 # Try fast download first if enabled
                 if downloader.fast_download_enabled and downloader.fast_download_key:
