@@ -83,6 +83,10 @@ class DownloadWorker:
         prefer_title_naming = self.config.get('downloads', 'prefer_title_naming', default=False)
         include_hash = self.config.get('downloads', 'include_hash', default="none")
 
+        # Get download path from config
+        download_path = self.config.get('downloads', 'download_path', default='/download')
+        output_dir = PROJECT_ROOT / download_path.lstrip('/')
+
         # Get incomplete folder path from config
         incomplete_folder_path = self.config.get('downloads', 'incomplete_folder_path', default='/download/incomplete')
         incomplete_dir = PROJECT_ROOT / incomplete_folder_path.lstrip('/')
@@ -97,7 +101,7 @@ class DownloadWorker:
 
         # Pass None if FlareSolverr is disabled, otherwise pass the URL
         self.downloader = AnnaDownloader(
-            output_dir=DOWNLOAD_PATH,
+            output_dir=output_dir,
             incomplete_dir=incomplete_dir,
             progress_callback=self.progress_callback,
             status_callback=self.status_callback,

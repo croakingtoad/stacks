@@ -53,6 +53,10 @@ downloads:
   include_hash:
     types: [INCLUDE_HASH]
     default: "none"
+  download_path:
+    types: [PATH]
+    default: "/download"
+    max_length: 128
   incomplete_folder_path:
     types: [PATH]
     default: "/download/incomplete"

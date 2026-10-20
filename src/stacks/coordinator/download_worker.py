@@ -56,6 +56,10 @@ def create_downloader(config: Config, progress_callback=None, status_callback=No
     prefer_title_naming = config.get('downloads', 'prefer_title_naming', default=False)
     include_hash = config.get('downloads', 'include_hash', default="none")
 
+    # Get download path
+    download_path = config.get('downloads', 'download_path', default='/download')
+    output_dir = PROJECT_ROOT / download_path.lstrip('/')
+
     # Get incomplete folder path
     incomplete_folder_path = config.get('downloads', 'incomplete_folder_path', default='/download/incomplete')
     incomplete_dir = PROJECT_ROOT / incomplete_folder_path.lstrip('/')
@@ -69,7 +73,7 @@ def create_downloader(config: Config, progress_callback=None, status_callback=No
     }
 
     return AnnaDownloader(
-        output_dir=DOWNLOAD_PATH,
+        output_dir=output_dir,
         incomplete_dir=incomplete_dir,
         progress_callback=progress_callback,
         status_callback=status_callback,

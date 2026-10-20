@@ -488,6 +488,7 @@ function loadSettings() {
       document.getElementById("setting-delay").value = config.downloads?.delay || 2;
       document.getElementById("setting-retry-count").value = config.downloads?.retry_count || 3;
       document.getElementById("setting-resume-attempts").value = config.downloads?.resume_attempts || 3;
+      document.getElementById("setting-download-path").value = config.downloads?.download_path || "/download";
       document.getElementById("setting-incomplete-folder-path").value = config.downloads?.incomplete_folder_path || "/download/incomplete";
       document.getElementById("setting-prefer-title-naming").checked = !!config.downloads?.prefer_title_naming;
       document.getElementById("setting-include-hash").value = config.downloads?.include_hash || "none";
@@ -536,6 +537,7 @@ function saveSettings() {
       delay: parseInt(document.getElementById("setting-delay").value),
       retry_count: parseInt(document.getElementById("setting-retry-count").value),
       resume_attempts: parseInt(document.getElementById("setting-resume-attempts").value),
+      download_path: document.getElementById("setting-download-path").value,
       incomplete_folder_path: document.getElementById("setting-incomplete-folder-path").value,
       prefer_title_naming: document.getElementById("setting-prefer-title-naming").checked,
       include_hash: document.getElementById("setting-include-hash").value,

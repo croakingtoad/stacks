@@ -95,6 +95,10 @@ def scraper_process(config_path: Path, stop_event: Event) -> None:
                 flaresolverr_timeout = config.get('flaresolverr', 'timeout', default=60)
                 flaresolverr_timeout_ms = flaresolverr_timeout * 1000
 
+                # Get download path
+                download_path = config.get('downloads', 'download_path', default='/download')
+                output_dir = PROJECT_ROOT / download_path.lstrip('/')
+
                 # Get incomplete folder path
                 incomplete_folder_path = config.get('downloads', 'incomplete_folder_path', default='/download/incomplete')
                 incomplete_dir = PROJECT_ROOT / incomplete_folder_path.lstrip('/')
@@ -108,7 +112,7 @@ def scraper_process(config_path: Path, stop_event: Event) -> None:
                 }
 
                 downloader = AnnaDownloader(
-                    output_dir=DOWNLOAD_PATH,
+                    output_dir=output_dir,
                     incomplete_dir=incomplete_dir,
                     flaresolverr_url=flaresolverr_url if flaresolverr_enabled else None,
                     flaresolverr_timeout=flaresolverr_timeout_ms,

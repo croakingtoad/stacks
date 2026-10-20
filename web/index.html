@@ -200,6 +200,11 @@
                   <input type="number" id="setting-resume-attempts" min="1" max="10" value="3" />
                 </div>
                 <div class="settings-group">
+                  <label for="setting-download-path">Download destination path</label>
+                  <input type="text" id="setting-download-path" placeholder="/download" maxlength="128" />
+                  <div class="comment">Path inside the container where completed downloads are saved. Mount your target folder (e.g. a Booklore bookdrop) to this path in Docker.</div>
+                </div>
+                <div class="settings-group">
                   <label for="setting-incomplete-folder-path">Incomplete folder path</label>
                   <input type="text" id="setting-incomplete-folder-path" placeholder="/download/incomplete" maxlength="128" />
                   <div class="comment">Path where partial downloads are stored. Remember to add a volume mount if you change this from the default one.</div>
