@@ -9,6 +9,7 @@ import json
 import logging
 import sqlite3
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Optional
 from urllib.parse import urlparse
 
@@ -532,11 +533,13 @@ class QueueOperations:
 
             # Update download status
             status = 'completed' if success else 'failed'
+            filename = Path(filepath).name if success and filepath else None
             conn.execute("""
                 UPDATE downloads
                 SET status = ?,
                     success = ?,
                     filepath = ?,
+                    filename = ?,
                     error = ?,
                     used_fast_download = ?,
                     completed_at = ?,
@@ -547,6 +550,7 @@ class QueueOperations:
                 status,
                 1 if success else 0,
                 filepath,
+                filename,
                 error,
                 1 if used_fast_download else 0,
                 datetime.now().isoformat(),
