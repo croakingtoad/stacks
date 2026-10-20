@@ -269,8 +269,8 @@ def download_worker_process(
                     mirrors_to_try = []
                     tried_domains = set()
 
-                    # Add assigned mirror first
-                    if assigned_mirror:
+                    # Add assigned mirror first (skip fast_download_only sentinel)
+                    if assigned_mirror and assigned_mirror.get('type') != 'fast_download_only':
                         mirrors_to_try.append(assigned_mirror)
                         domain = _extract_domain(assigned_mirror.get('url', ''))
                         if domain:
@@ -331,7 +331,10 @@ def download_worker_process(
                         error = last_error
 
                 if not success and not error:
-                    error = "All mirrors failed"
+                    if assigned_mirror and assigned_mirror.get('type') == 'fast_download_only':
+                        error = "Fast download failed and no mirror links available"
+                    else:
+                        error = "All mirrors failed"
 
             except Exception as e:
                 worker_logger.error(f"Download error: {e}", exc_info=True)

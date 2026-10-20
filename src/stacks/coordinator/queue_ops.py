@@ -317,8 +317,8 @@ class QueueOperations:
         """
         conn = get_connection()
         try:
-            if error or not mirrors:
-                # Scraping failed - mark as failed
+            if error:
+                # Exception during scraping - mark as failed
                 conn.execute("""
                     UPDATE downloads
                     SET status = 'failed',
@@ -326,10 +326,9 @@ class QueueOperations:
                         completed_at = ?,
                         assigned_worker = NULL
                     WHERE md5 = ? AND status = 'scraping'
-                """, (error or 'No mirrors found', datetime.now().isoformat(), md5))
+                """, (error, datetime.now().isoformat(), md5))
             else:
-                # Scraping succeeded - move to queued
-                # Set title to filename if not already set
+                # Move to queued — even with no mirrors so download worker can try fast_download
                 conn.execute("""
                     UPDATE downloads
                     SET status = 'queued',
@@ -437,7 +436,44 @@ class QueueOperations:
                         # Mirror already claimed by another worker, try next mirror
                         continue
 
-            # No jobs with available mirrors
+            # Second pass: claim no-mirror items so download worker can try fast_download
+            for row in queued_rows:
+                mirrors_json = row['mirrors']
+                if mirrors_json:
+                    try:
+                        if json.loads(mirrors_json):
+                            continue  # Has real mirrors; already tried in first pass
+                    except (json.JSONDecodeError, ValueError):
+                        continue
+
+                # Use a synthetic domain lock so only one worker claims it
+                synthetic_domain = f"~fd~{row['md5'][:16]}"
+                try:
+                    conn.execute("""
+                        INSERT INTO busy_mirrors (domain, worker_id, claimed_at)
+                        VALUES (?, ?, ?)
+                    """, (synthetic_domain, worker_id, datetime.now().isoformat()))
+                    conn.execute("""
+                        UPDATE downloads
+                        SET status = 'downloading',
+                            assigned_worker = ?,
+                            assigned_mirror = ?
+                        WHERE id = ?
+                    """, (worker_id, json.dumps({
+                        'url': '', 'domain': synthetic_domain, 'type': 'fast_download_only'
+                    }), row['id']))
+                    conn.commit()
+                    result = row_to_dict(row)
+                    result['assigned_mirror'] = {
+                        'url': '', 'domain': synthetic_domain, 'type': 'fast_download_only'
+                    }
+                    logger.info(f"Worker {worker_id} claimed no-mirror job {row['md5']} for fast_download attempt")
+                    return result
+                except sqlite3.IntegrityError:
+                    conn.rollback()
+                    continue
+
+            # No jobs available
             return None
 
         except Exception as e:

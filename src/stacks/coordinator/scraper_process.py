@@ -135,7 +135,6 @@ def scraper_process(config_path: Path, stop_event: Event) -> None:
                         })
                     scraper_logger.info(f"Found {len(mirrors)} mirrors for {md5}")
                 else:
-                    error = "No mirrors found"
                     scraper_logger.warning(f"No mirrors found for {md5}")
 
             except Exception as e:
